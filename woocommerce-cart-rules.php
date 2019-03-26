@@ -12,18 +12,28 @@
 // Mitigate direct file access
 defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
-function wcr_test_plugin() {
-    print('This is woocommerce-cart-rules');
-}
-add_action( 'admin_notices', 'wcr_test_plugin' );
-
 /**
  * Check if WooCommerce is active
  **/
 if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
-    // Put your plugin code here
-    function wcr_test_woo_is_active() {
-        print('WooCommerce is active!');
+    function prevent_multiple_bulk_orders() {
+        global $woocommerce;
+        global $product;
+        // Get the categories this product belongs to
+        $category_ids = $product->get_category_ids();
+        // Check if it's a bulk product (ID 122) TODO: Make variable
+        $is_bulk = in_array(122, $category_ids);
+        // If it's not a bulk product, then we can add to cart as normal.
+        if (!$is_bulk) {
+            return true;
+        }
+        // Otherwise, we need to check to see if the cart already contains a different bulk product
+        $cart = $woocommerce->$cart;
+        foreach ( $cart->get_cart_contents() as $cart_item_key => $values ) {
+            printr($cart_item_key);
+            printr($values);
+        }
     }
-    add_action( 'admin_notices', 'wcr_test_woo_is_active' );
+    // Run this function whenever an item is added to the cart.
+    add_action('woocommerce_add_to_cart', 'prevent_multiple_bulk_orders');
 }
