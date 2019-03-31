@@ -16,12 +16,14 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 function wcr_prevent_multiple_bulk_orders($cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data) {
     global $woocommerce;
 
+    // Restricted product category
+    $restricted_cat = (int) get_option('wcr_restricted_category_id');
     // Get product
     $product = wc_get_product($product_id);
     // Get the categories this product belongs to
     $category_ids = $product->get_category_ids();
-    // Check if it's a bulk product (ID 122) TODO: Make variable
-    $is_bulk = in_array(122, $category_ids);
+    // Check if it's a bulk product
+    $is_bulk = in_array($restricted_cat, $category_ids);
     // If it's not a bulk product, then we can add to cart as normal.
     if (!$is_bulk) {
         return true;
@@ -29,72 +31,179 @@ function wcr_prevent_multiple_bulk_orders($cart_item_key, $product_id, $quantity
     // Otherwise, we need to check to see if the cart already contains a different bulk product
     $cart = $woocommerce->cart;
     foreach ( $cart->get_cart_contents() as $cart_item_key => $values ) {
-        $cart_item_is_bulk = in_array(122, $values['data']->get_category_ids());
+        $cart_item_is_bulk = in_array($restricted_cat, $values['data']->get_category_ids());
         $cart_item_is_different = $values['data']->get_id() !== $product_id;
         if ($cart_item_is_bulk and $cart_item_is_different) {
-            throw new Exception( 'You cannot have more than one kind of bulk product in your cart.');
+            $message = get_option('wcr_restricted_error_message', '[Configure this message in WooCommerce -> Cart Rules Plugin]');
+            throw new Exception($message);
         }
     }
     // No conflicts were found
     return true;
 }
+add_action('woocommerce_add_to_cart', 'wcr_prevent_multiple_bulk_orders', 10, 6);
 
-// Render the options page
-function wcr_options_page_html()
-{
-    // check user capabilities
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-    ?>
+// https://codex.wordpress.org/Adding_Administration_Menus
+// https://stackoverflow.com/questions/16928929/add-custom-admin-menu-to-woocommerce
+/** Step 3. */
+function wcr_options_html() {
+	if ( !current_user_can( 'manage_woocommerce' ) )  {
+		wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
+	}
+	?>
     <div class="wrap">
-        <h1><?= esc_html(get_admin_page_title()); ?></h1>
-        <form action="options-general.php?page=wcr" method="post">
+        <h1>WooCommerce Cart Rules</h1>
+        <form method="POST" action="options.php">
             <?php
-            // output security fields for the registered setting "wcr_options"
-            settings_fields('wcr_options');
-            // output setting sections and their fields
-            // (sections are registered for "wporg", each field is registered to a specific section)
-            do_settings_sections('wcr');
-            // output save settings button
-            submit_button('Save Settings');
+            settings_fields( 'wcr' );	//pass slug name of page, also referred to in Settings API as option group name
+            do_settings_sections( 'wcr' ); 	//pass slug name of page
+            submit_button();
             ?>
         </form>
     </div>
     <?php
 }
 
-// Add the options submenu
-function wcr_options_page() {
-    // add_submenu_page(
-    //     'edit.php?post_type=shop_order',
-    //     'WooCommerce Cart Rules Options',
-    //     'Cart Rules Options',
-    //     'manage_options',
-    //     'wcr',
-    //     'wcr_options_page_html'
-    // );
-    add_options_page(
-        'WooCommerce Cart Rules Options',
-        'Cart Rules',
-        'manage_options',
-        'wcr',
-        'wcr_options_page_html'
+/** Step 1. */
+function wcr_add_submenu() {
+	add_submenu_page( 'woocommerce', 'WooCommerce Cart Rules', 'Cart Rules Plugin', 'manage_woocommerce', 'wcr', 'wcr_options_html' );
+}
+
+/** Step 2 */
+// Needs to be priority 20 to make sure it runs after WooCommerce sets up its own menus
+add_action( 'admin_menu', 'wcr_add_submenu', 20 );
+
+// https://codex.wordpress.org/Settings_API
+// ------------------------------------------------------------------
+// Add all your sections, fields and settings during admin_init
+// ------------------------------------------------------------------
+//
+
+function wcr_settings_section_cb() {
+    echo '<p>Set the restricted category and the error message.</p>';
+}
+
+function wcr_restricted_category_id_cb() {
+    // https://stackoverflow.com/a/21012252
+    $taxonomy     = 'product_cat';
+    $orderby      = 'name';
+    $show_count   = 0;      // 1 for yes, 0 for no
+    $pad_counts   = 0;      // 1 for yes, 0 for no
+    $hierarchical = 1;      // 1 for yes, 0 for no
+    $title        = '';
+    $empty        = 0;
+
+    $args = array(
+            'taxonomy'     => $taxonomy,
+            'orderby'      => $orderby,
+            'show_count'   => $show_count,
+            'pad_counts'   => $pad_counts,
+            'hierarchical' => $hierarchical,
+            'title_li'     => $title,
+            'hide_empty'   => $empty
     );
+    $all_categories = get_categories( $args );
+    ?>
+    <select name="wcr_restricted_category_id" id="wcr_restricted_category_id" required>
+        <option value="">Choose a product category</option>
+        <?php
+        $current_cat_id = (int) get_option('wcr_restricted_category_id');
+        foreach($all_categories as $key => $cat) {
+            $is_current_cat_id = $cat->cat_ID === $current_cat_id;
+            echo sprintf(
+                '<option value="%d" %s>%s</option>',
+                $cat->cat_ID,
+                $is_current_cat_id ? 'selected' : '',
+                $cat->cat_name
+            );
+        }
+        ?>
+    </select>
+    <?php
 }
 
-// Deactivation
-function deactivate_woocommerce_cart_rules() {
-    remove_submenu_page('options-general.php', 'wcr');
+function wcr_sanitize_category_id($input) {
+    $int_input = (int) $input;
+    if ($int_input < 0) {
+        throw new Error('Category ID must be greater than 0.');
+    }
+    return $int_input;
 }
 
-register_deactivation_hook( __FILE__, 'deactivate_woocommerce_cart_rules' );
-
-
-// Check if WooCommerce is active
-if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
-    // Run this function whenever an item is added to the cart.
-    add_action('woocommerce_add_to_cart', 'wcr_prevent_multiple_bulk_orders', 10, 6);
-    // Add the options page to the Dashboard
-    add_action('admin_menu', 'wcr_options_page');
+function wcr_restricted_error_message_cb() {
+    // get the value of the setting we've registered with register_setting()
+    $setting = get_option('wcr_restricted_error_message');
+    // output the field
+    ?>
+    <input
+        type="text"
+        size="40"
+        required
+        name="wcr_restricted_error_message"
+        value="<?php echo isset( $setting ) ? esc_attr( $setting ) : ''; ?>"
+    >
+    <?php
 }
+
+function wcr_sanitize_error_message($input) {
+    if (!is_string($input)) {
+        throw new TypeError('Error message must be a string, not a '. gettype($input) .'.');
+    }
+    return sanitize_text_field($input);
+}
+
+function wcr_settings_api_init() {
+    add_settings_section(
+        'wcr_settings_section',
+        'Settings',
+        'wcr_settings_section_cb',
+        'wcr'
+    );
+
+    add_settings_field(
+        'wcr_restricted_category_id',
+        'Restricted Category',
+        'wcr_restricted_category_id_cb',
+        'wcr',
+        'wcr_settings_section'
+    );
+
+    add_settings_field(
+        'wcr_restricted_error_message',
+        'Restricted Error Message',
+        'wcr_restricted_error_message_cb',
+        'wcr',
+        'wcr_settings_section'
+    );
+
+    register_setting(
+        'wcr',
+        'wcr_restricted_category_id',
+        array(
+            'type' => 'integer',
+            'description' => 'The WooCommerce category ID that limited to one type per cart.',
+            'sanitize_callback' => 'wcr_sanitize_category_id'
+        )
+    );
+    register_setting(
+        'wcr',
+        'wcr_restricted_error_message',
+        array(
+            'type' => 'string',
+            'description' => 'The error message to be displayed when multiple restricted items are added to the cart.',
+            'sanitize_callback' => 'wcr_sanitize_error_message'
+        )
+    );
+} // wcr_settings_api_init()
+
+add_action( 'admin_init', 'wcr_settings_api_init' );
+
+// Remove options
+function wcr_remove_options() {
+    delete_option('wcr_restricted_category_id');
+    delete_option('wcr_restricted_error_message');
+}
+function wcr_uninstall() {
+    wcr_remove_options();
+}
+register_uninstall_hook(__FILE__, 'wcr_uninstall');
