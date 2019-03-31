@@ -43,9 +43,9 @@ function wcr_prevent_multiple_bulk_orders($cart_item_key, $product_id, $quantity
 }
 add_action('woocommerce_add_to_cart', 'wcr_prevent_multiple_bulk_orders', 10, 6);
 
+// Main form rendering function for the options
 // https://codex.wordpress.org/Adding_Administration_Menus
 // https://stackoverflow.com/questions/16928929/add-custom-admin-menu-to-woocommerce
-/** Step 3. */
 function wcr_options_html() {
 	if ( !current_user_can( 'manage_woocommerce' ) )  {
 		wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
@@ -64,21 +64,17 @@ function wcr_options_html() {
     <?php
 }
 
-/** Step 1. */
+// Register the options inside the WooCommerce menu
 function wcr_add_submenu() {
 	add_submenu_page( 'woocommerce', 'WooCommerce Cart Rules', 'Cart Rules Plugin', 'manage_woocommerce', 'wcr', 'wcr_options_html' );
 }
 
-/** Step 2 */
 // Needs to be priority 20 to make sure it runs after WooCommerce sets up its own menus
 add_action( 'admin_menu', 'wcr_add_submenu', 20 );
 
 // https://codex.wordpress.org/Settings_API
-// ------------------------------------------------------------------
-// Add all your sections, fields and settings during admin_init
-// ------------------------------------------------------------------
-//
 
+// Settings page description.
 function wcr_settings_section_cb() {
     ?>
     <p>Use this plugin to prevent a customer from adding multiple different products from a specific category to their cart.</p>
@@ -86,6 +82,7 @@ function wcr_settings_section_cb() {
     <?php
 }
 
+// Render the selector for the restricted product category
 function wcr_restricted_category_id_cb() {
     // https://stackoverflow.com/a/21012252
     $taxonomy     = 'product_cat';
@@ -125,6 +122,7 @@ function wcr_restricted_category_id_cb() {
     <?php
 }
 
+// Make sure the category ID we get from the client is a valid value
 function wcr_sanitize_category_id($input) {
     $int_input = (int) $input;
     if ($int_input < 0) {
@@ -133,6 +131,7 @@ function wcr_sanitize_category_id($input) {
     return $int_input;
 }
 
+// Render the text input for the error message
 function wcr_restricted_error_message_cb() {
     // get the value of the setting we've registered with register_setting()
     $setting = get_option('wcr_restricted_error_message');
@@ -148,6 +147,7 @@ function wcr_restricted_error_message_cb() {
     <?php
 }
 
+// Make sure the error message is a string and is sanitized
 function wcr_sanitize_error_message($input) {
     if (!is_string($input)) {
         throw new TypeError('Error message must be a string, not a '. gettype($input) .'.');
@@ -155,6 +155,7 @@ function wcr_sanitize_error_message($input) {
     return sanitize_text_field($input);
 }
 
+// Register the settings using the Settings API
 function wcr_settings_api_init() {
     add_settings_section(
         'wcr_settings_section',
@@ -197,8 +198,7 @@ function wcr_settings_api_init() {
             'sanitize_callback' => 'wcr_sanitize_error_message'
         )
     );
-} // wcr_settings_api_init()
-
+}
 add_action( 'admin_init', 'wcr_settings_api_init' );
 
 // Remove options
