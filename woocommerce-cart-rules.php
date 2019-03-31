@@ -140,7 +140,7 @@ function wcr_restricted_error_message_cb() {
     ?>
     <input
         type="text"
-        size="40"
+        size="80"
         required
         name="wcr_restricted_error_message"
         value="<?php echo isset( $setting ) ? esc_attr( $setting ) : ''; ?>"
