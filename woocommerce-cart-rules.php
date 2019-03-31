@@ -80,7 +80,10 @@ add_action( 'admin_menu', 'wcr_add_submenu', 20 );
 //
 
 function wcr_settings_section_cb() {
-    echo '<p>Set the restricted category and the error message.</p>';
+    ?>
+    <p>Use this plugin to prevent a customer from adding multiple different products from a specific category to their cart.</p>
+    <p>If they already have a product from this category in their cart, attempts to add a different product from the same category will be denied.</p>
+    <?php
 }
 
 function wcr_restricted_category_id_cb() {
@@ -162,7 +165,7 @@ function wcr_settings_api_init() {
 
     add_settings_field(
         'wcr_restricted_category_id',
-        'Restricted Category',
+        'Restricted product category',
         'wcr_restricted_category_id_cb',
         'wcr',
         'wcr_settings_section'
@@ -170,7 +173,7 @@ function wcr_settings_api_init() {
 
     add_settings_field(
         'wcr_restricted_error_message',
-        'Restricted Error Message',
+        'Error message to show to the customer',
         'wcr_restricted_error_message_cb',
         'wcr',
         'wcr_settings_section'
