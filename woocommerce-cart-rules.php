@@ -30,9 +30,13 @@ function wcr_prevent_multiple_bulk_orders($cart_item_key, $product_id, $quantity
     }
     // Otherwise, we need to check to see if the cart already contains a different bulk product
     $cart = $woocommerce->cart;
-    foreach ( $cart->get_cart_contents() as $cart_item_key => $values ) {
-        $cart_item_is_bulk = in_array($restricted_cat, $values['data']->get_category_ids());
-        $cart_item_is_different = $values['data']->get_id() !== $product_id;
+    // print_r($cart->get_cart_contents());
+    foreach ( $cart->get_cart_contents() as $cart_item_key => $cart_item ) {
+        // Not all cart items have easy access to category IDs so we gotta fetch them
+        // https://wordpress.stackexchange.com/a/271065
+        $cart_item_category_ids = wc_get_product($cart_item['product_id'])->get_category_ids();
+        $cart_item_is_bulk = in_array($restricted_cat, $cart_item_category_ids);
+        $cart_item_is_different = ($cart_item['product_id'] !== $product_id or $cart_item['variation_id'] !== $variation_id);
         if ($cart_item_is_bulk and $cart_item_is_different) {
             $message = get_option('wcr_restricted_error_message', '[Configure this message in WooCommerce -> Cart Rules Plugin]');
             throw new Exception($message);
