@@ -5,7 +5,7 @@
  * Description: Add rules for what products can be in a cart at the same time
  * Version:     1.0.1
  * Author:      Noelle Leigh
- * Author URI:  https://github.com/n-leigh
+ * Author URI:  https://github.com/noelleleigh
  * License:     GPL2
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
