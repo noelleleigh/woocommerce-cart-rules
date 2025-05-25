@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: WooCommerce Cart Rules
- * Plugin URI:  https://github.com/n-leigh/woocommerce-cart-rules
+ * Plugin URI:  https://github.com/noelleleigh/woocommerce-cart-rules
  * Description: Add rules for what products can be in a cart at the same time
  * Version:     1.0.1
  * Author:      Noelle Leigh
